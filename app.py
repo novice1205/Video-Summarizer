@@ -18,7 +18,7 @@ if API_KEY:
 
 # Page Configuration
 st.set_page_config(
-    page_title="Multimodal AI Agent - Video Summarization",
+    page_title="Multimodal AI Agent - Video Summarizer",
     page_icon="📹",
     layout="wide"
 )
