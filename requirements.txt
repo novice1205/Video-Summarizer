@@ -13,6 +13,5 @@ psycopg[binary]
 pypdf
 streamlit
 phidata
-phi-1ai
 google-generativeai
 duckduckgo-search
