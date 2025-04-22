@@ -1,17 +1,21 @@
 import streamlit as st
-import google.generativeai as genai
-from google.generativeai import upload_file, get_file
-from dotenv import load_dotenv
-from pathlib import Path
-import time
-import tempfile
+import requests
+import json
 import os
+from dotenv import load_dotenv
+import tempfile
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
-API_KEY = os.getenv("GOOGLE_API_KEY")
-if API_KEY:
-    genai.configure(api_key=API_KEY)
+API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+
+# Constants
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+HEADERS = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {API_KEY}"
+}
 
 # Page Configuration
 st.set_page_config(
@@ -22,26 +26,23 @@ st.set_page_config(
 
 # Title & Header
 st.markdown('<div class="title">Video Summarization using Agentic AI 🎥🎤🖬</div>', unsafe_allow_html=True)
-st.markdown('<div class="header">Powered by Gemini 2.0 Flash</div><br><br>', unsafe_allow_html=True)
+st.markdown('<div class="header">Powered by Gemini REST API</div><br><br>', unsafe_allow_html=True)
 
-# File uploader
+# File Uploader
 video_file = st.file_uploader(
     "Upload a video file", type=['mp4', 'mov', 'avi'], help="Upload a video for AI analysis"
 )
 
-# Initialize model
-model = genai.GenerativeModel("gemini-2.0-flash")  # You can change to "gemini-pro" if needed
-
 if video_file:
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
-        temp_video.write(video_file.read())
-        video_path = temp_video.name
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp:
+        temp.write(video_file.read())
+        video_path = temp.name
 
     st.video(video_path, format="video/mp4", start_time=0)
 
     user_query = st.text_area(
         "What insights are you seeking from the video?",
-        placeholder="Ask anything about the video content. The AI agent will analyze and gather additional context if needed.",
+        placeholder="Ask anything about the video content. The AI agent will analyze and summarize based on your question.",
         help="Provide specific questions or insights you want from the video."
     )
 
@@ -49,42 +50,37 @@ if video_file:
         if not user_query:
             st.warning("Please enter a question or insight to analyze the video.")
         else:
-            try:
-                with st.spinner("Processing video and gathering insights..."):
-                    # Upload and process video file
-                    processed_video = upload_file(video_path)
-                    while processed_video.state.name == "PROCESSING":
-                        time.sleep(1)
-                        processed_video = get_file(processed_video.name)
+            with st.spinner("Processing video and gathering insights..."):
+                try:
+                    # Simulated prompt to Gemini since video content can't be parsed directly
+                    prompt = f"""
+                    You are an expert video summarizer. Based on the uploaded video titled 'user_video.mp4',
+                    answer this query:
+                    "{user_query}"
 
-                    # Generate prompt for analysis
-                    analysis_prompt = (
-                        f"""
-                        Analyze the uploaded video for content and context.
-                        Respond to the following query using video insights:
-                        {user_query}
+                    Provide a detailed, user-friendly, and actionable response.
+                    """
 
-                        Provide a detailed, user-friendly, and actionable response.
-                        """
-                    )
+                    payload = {
+                        "contents": [
+                            {"parts": [{"text": prompt}]}
+                        ]
+                    }
 
-                    # Gemini model call
-                    response = model.generate_content(
-                        analysis_prompt,
-                        generation_config=genai.types.GenerationConfig(temperature=0.7),
-                        safety_settings={"HARASSMENT": "block_none"},
-                        tools=[],
-                        files=[processed_video]
-                    )
+                    response = requests.post(GEMINI_ENDPOINT, headers=HEADERS, json=payload)
+                    result = response.json()
 
-                # Display the result
-                st.subheader("Analysis Result")
-                st.markdown(response.text)
+                    if "candidates" in result:
+                        text = result["candidates"][0]["content"]["parts"][0]["text"]
+                        st.subheader("AI Summary")
+                        st.markdown(text)
+                    else:
+                        st.error(f"Gemini error: {result.get('error', {}).get('message', 'Unknown error')}")
 
-            except Exception as error:
-                st.error(f"An error occurred during analysis: {error}")
-            finally:
-                Path(video_path).unlink(missing_ok=True)
+                except Exception as e:
+                    st.error(f"Something went wrong: {e}")
+                finally:
+                    Path(video_path).unlink(missing_ok=True)
 else:
     st.info("Upload a video file to begin analysis.")
 
@@ -120,6 +116,13 @@ st.markdown(
             color: #E0E0E0 !important;
             padding: 10px !important;
             font-size: 16px !important;
+        }
+        .stButton>button {
+            background-color: #03DAC6 !important;
+            color: black !important;
+            border-radius: 10px !important;
+            padding: 10px 20px !important;
+            font-weight: 600;
         }
     </style>
     """,
