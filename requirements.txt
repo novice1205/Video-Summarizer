@@ -12,6 +12,8 @@ pgvector
 psycopg[binary]
 pypdf
 streamlit
-phidata
-google-generativeai
+python-dotenv
+google-generativeai==0.4.1
+protobuf<4.0.0
+grpcio==1.62.1
 duckduckgo-search
